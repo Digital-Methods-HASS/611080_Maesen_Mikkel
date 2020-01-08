@@ -1,0 +1,204 @@
+---
+title: "Danmarks_Breve"
+author: "Mikkel Bang Maesen"
+date: "5/12/2019"
+output:
+html_document: default
+word_document: default
+---
+The very first thing for this project, was to install the R-package: Solrium. This package is designed to work as a text and metadata searchengine, which fits perfetly with this style of paper that has a semantic view on history.
+```{r}
+install.packages("solrium")
+
+library(solrium)
+
+```
+
+After installing I check whether the package was installed correctly. It was.
+
+```{r}
+library("solrium")
+```
+
+So the package has been installed, but I still have no data in R, and I therefore am going to download the dataset of "Danmarks Breve", which on the basis of its scripting is directly compatible with R and especially Solrium. The data is going to be stored in completely equal terms, as a consequence of its scripting. In theory everything gets stored as metadata, even the letters themselves are stored in a single column.
+
+```{r}
+letters <- SolrClient$new(host = "public-index.kb.dk/solr/letters-core", path = "search", port = NULL)
+```
+
+Now the data is visible, which means that everything is stored in R on said equal terms. This means that I'll now be able to put up my own filters in terms of what I want to combine in my analysis. With this I don't have to consider anything else but the very thing i'm trying to research.
+
+To check whether or not the database is working, I create a hypothetical solr-search in the dataset, inspired by Max Odsbjerg. Solr-searching is basically just using the filtering package of solr, when used, it will create a single table exluding every parameter not included in the paranthesis of the search.
+To try I will filter out all letters, that hasn't been sent from Berlin, and then create a tabel called "berlin" with all the letters from this. It gets me 420 letters, and I now know that the database is working.
+
+```{r}
+berlin <- solr_search(letters, name = "letters-core", params = list(q = "sender_location_tesim:berlin"))
+```
+
+As mentioned beforehand, I initially wanted to examine and explore the public reaction and attitude towards the war Second Danish-Prussian War in 1864. It would have been interesting to investigate first the danish perception and attitude, and secondly the german, to find out if there was a different approach to the conflict.
+
+I must admit however, that the database simply can't answer the complexity of such a qustion, as it only contains danish letters, and indeed very few sent from germany - Of course added on top of that the afformentioned problems with the sources in general.
+
+I do however keep going in the same direction just to check the flaws and opportunities, that the dataset provides. Beforehand, I only got at limited amount of letters, as R by default only provides a limited amount of rows. Therefore I had to specify, that I wanted more rows to encompas all of the letters at once.
+
+```{r}
+berlin <- solr_search(letters, name = "letters-core", params = list(q = "sender_location_tesim:berlin", rows=1000))
+```
+
+This helped, and I got my result of 420 letters sent from Berlin in this period. Just to check how the proportions change, I will do the same search, but switch out Berlin with Copenhagen, and do the same search again. 1 row equals 1 letter.
+
+```{r}
+københavn <- solr_search(letters, name = "letters-core", params = list(q = "sender_location_tesim:københavn", rows=5000))
+```
+
+This throws some problems, as there probably are more than precisely a 1000 letters sent from Copenhagen in the database. I try expanding the rows by first 1500, then 2500 and at last 5000, and come op with the result of 2999 letters sent form copenhagen.
+
+
+# The base project
+When I found out that the initial research-goal was too ambitious for the soruce-material, I realised that I had to devise a new sustainable idea. With Max Odsbjerg as inspiration, I decided on creating a starting point in the first world war. I then put a division in time, and a span of the war itself, to find out which letters from the dataset, were sent during the period of the war. I then created the table "war_Great", and had a look around in it to find something interesting to further investigate.
+
+```{r}
+war_Great <- solr_search(letters, name = "letters-core", params = list(q="date_ssim:[1914-08-01 TO 1918-11-11]", rows=1000))
+```
+
+I only got 291 results, which in a way is disappointing, as there definetely are more letters in the database, that were sent during this period. The reason for this "bad" result can be affiliated with alot of factors. One of the key ones, I beleive, are that the letters hasn't been directly dated into dataset, and therefore lack some key metadata. This is also a problem with for example letter_location, where many locations are intransparant for text-mining purposes.
+
+However one letter-collection from the dated filtering of letters above, that stood out, was the one called "Krestens breve". This dataset, is as mentioned, a collection of letters sent from the danish-german soldier, Kresten who was stationed in France during the war.
+
+Therefore this is where the actual project is initated. I want to investigate this letter-collection even further, as I want to qualify the danish soldier's perception and experience of the war. This has of course been done before in the field, but I beleive, that this is the first time that a letter-collection of this sort has been processed with digital methods. The computaion and textmining in this dataset is a new way of looking at the perception of the war, as it is not up to me to interpret the letters and results, but rather just present them.
+
+Therefore I will now pull out the "Krestens Breve" from the main dataset "Danmarks breve". First i tried with a 1000 rows, but had to expand it to 2000 rows. The new table including all of the letters is called Kresten. The solr-search then creates the table Kresten, and I filtered in the volume_title_tesim-column, which is the actual publication name.
+```{r}
+Kresten <- solr_search(letters, name = "letters-core", params = list(q = "volume_title_tesim:Krestens Breve", rows=2000))
+```
+
+That gives me a result of 1560 letters written from Kresten. And now that we've filtered out every other letter from the database, I can start textmining and look further into the semantics of his letters.
+
+This I will do through first looking at the most used words of his letters, and then dwelve deeper into some of the more meaningful and desribing words. For example the word "krig" (war) can is interesting to examine further. What connotaions does Kresten put with the word krig? How much does it occur in his letters?
+These are qustions that will be answered to shed a light on Krestens experience with the war.
+
+Now that I've filtered out the letters that are of no interest to me, I will no longer use the Solr, but rather the package tidytext, which is a textmining tool, capable of running searches on words. I will first of all use it to find the most ocurring words, but also to do text-relation work.
+I therefore install the package tidytext taken from :::INDSÆT ET LINK HER:::: and check if it has downloaded both tidytext and tidyverse packages.
+
+```{r}
+install.packages("tidytext")
+
+library(tidytext)
+install.packages("tidyverse")
+
+library(tidyverse)
+```
+
+The tidytext package splits every letter individually. I apply it to the column text_tesim, which is the letter-text itself. The tidytext-package then gives every word an individual value also called tokens.
+```{r}
+Breve_ttm <- Kresten %>%
+unnest_tokens(word, text_tesim)
+```
+Now every word has its own token or value, and everything in Krestens letters has been systemized, so that I can apply new textual filters in my analysis.
+
+I will now do a search on the most ocurring words in the letters. Initially without any reservatoins in regards to words. This then gave me a result which wasn't very useful. Of course the most ocurring words aren't the ones with the most meaning. They are binding-words such as "er" (are) or "jeg" (I). To filter these out, I will therefore have to implement a stopwordlist. This will in turn give me a much more meaningfull result.
+```{r}
+Breve_ttm%>%
+anti_join(Stopordsliste)%>%
+count(word, sort=TRUE)
+```
+
+The stopwordlist is provided by Max Odsbjerg, but I have made some alterations to it, so it takes the traditional way of spelling "å" into consideration. I then apply this to the filtering above.
+
+```{r}
+Stopordsliste <- read_csv("https://gist.githubusercontent.com/MikkelMaesen/dd42d034c3decff034706bcc2fc9f101/raw/970bc9f63d7a2bee322cfdaec8368f34a9650882/Stopord.csv")
+```
+I do still however still have alot of "writing-words" which are not interesting for the analysis. I could proceed to make a more elaborate stop-word list, but this would be very meticulous and demanding. I therefore decide to just myself look through some of the results and pick out some the most interesting words in the top 50 most ocurring. If I had decided to make a stopwordlist, I would end up doing the same work over again.
+
+The ones i found to be most interresting are as listed:
+"krig" (war)
+"hjem" (home)
+"jul" (christmas)
+"død" (dead/death)
+"dræb" (kill)
+"skyttegraven" (trench)
+"brag" (a sound: bang)
+"orlov" (furlough)
+"Danmark" (Denmark)
+"Fransk" (french)
+"ende" (end)
+"forfærdelig" (terrible)
+"gud" (god)
+"mor" (mother)
+"fri" (free)
+"saarede" (injured)
+It is interesting that the most obvious word is "krig" (war), as we can then qualify, admittetly rather banal, that the war was a big part what was written about in the letters. Though definetely not the most occuring - Actually the 47th most occuring word in the letters. The letters were often written to Krestens family, and therefore there might have been much else to write about for him, and maybe the letters were actually a kind of sanctuary for him, where the war maybe didn't have to inflict every aspect of life.
+Of course "hjem" (home) is a high-scorer aswell, being the 19th most occurring word. The longing for home must have been a big part of writing to ones family during war time - Especially during the grim circumstances in the trenches of the first world war. And interestingly enough "krig" (war) is much less occuring than "hjem" (home), which of course indicates that "hjem" (home) is more important for Kresten while writing the letters, but also that "hjem" might be of more importance in general for the soldiers in war times.
+"jul" (christmas) is the third word, and probably the most precarius of the list. This follows the line of "hjem", as "jul" and "hjem" is closely related to eachother in regards of it's conotations. One could imagine that "jul" would be a time of year where many letters were sent to mark the holidays, but also to reestablish connection with the soldiers homestead.
+Another frequently occuring word is "skyttegrav" (trench) which also relates to the theme of war. The "skyttegrav" is of course an infamous aspect of the the first world war, and the occurence of the word, indicates that this was a considerable part of Krestens experience with the war. This could however also indicate that he was stationed in the "skyttegrav" and therefore had to desribe it for his family.
+The word "gud" (god) is also of high occurrence. This is not very surprising as many people at the time of the war were deeply religios. Though it could indicate that the soldiers had a need to process their experiences in a religios frame, and thus also indicate the hardship and pressure that the soldiers were put under.
+
+
+The occurence of words are interesting when examining the soldier's mindset in itself. But to qualify it further, it is even more interesting to look at said words relations in the letters. This will be done again with the tidytext-package. By looking at the relation of words, I can get a more clear picture of the context in which they were written, and with that go deeper in the analisys of the letters.
+
+
+```{r}
+library(dplyr)
+library(tidytext)
+
+Breve_ttm_ngram <- Kresten %>%
+unnest_tokens(bigram, text_tesim, token = "ngrams", n = 2)
+```
+To do this relation-search I will use the tool "ngram", to first of all create a table of all words, and splits it into two seperate columns, so that all words have a relation, and a count of how many occurences that relation is apparent in the letters.
+
+```{r}
+Breve_ttm_ngram <- Breve_ttm_ngram%>%
+count(bigram, sort = TRUE)
+```
+
+This then creates a rather useless table of words, but I will again apply filters to the columns, so that I can meaning out of it. I could implement a stopword list, but this would however just be unnessecary, as the filters will exclude "uninterresting" relatoins.
+
+```{r}
+library(tidyr)
+
+Breve_ttm_ngram <- Breve_ttm_ngram %>%
+separate(bigram, c("word1","word2"), sep = " ")
+```
+
+Now through tidytext, I am able to seperate the words. Beforehand the words were collected as one big pile of words where only quantity mattered. Now the words are seperated and collected in pairs. Whenever there is whitespace between words, a pair is created and listed. Now instead of just having "word1" and "word2", i can swap these factors with an actual word from above and thereby examine the relations in which they were expressed.
+
+```{r}
+library(tidyr)
+
+Breve_ttm_ngram%>%
+filter(word2 == "krig") %>%
+count(word1, sort = TRUE)
+```
+
+The war apparently wasn't a subject of high ocurrence in Kresten's letters. The following words after "Krig" (War), were generelly inconsistent, in the sense that no real pattern can be drawn from it. Some connections of interest could be "forrykte" (distraught), "Danmark" (Denmark), "moderne" (modern) and, "næste" (next). "Distraught" is interesting because its a valuation of the word "war". The fact that Kresten mentions "next" in relation to "war" is interesting aswell, as this can be seen as a prognosis for another war, but can also be interpreted as a sign of the hopelessness in the minds of the soldiers.
+
+I can broaden this investiagtion even further, by looking at word relations for other of affomentioned words. This will be done by substituting the word "krig" with antoher word from the list above.
+
+```{r}
+Breve_ttm_ngram%>%
+filter(word2 == "hjem") %>%
+count(word1, sort = TRUE)
+```
+
+In this case I chose "hjem" (home). There is no general theme here either, as the case was with "krig" (war) aswell. Although there are some single connections worth dwelling with. The word "Danmark" is interesting, as this means Kresten relates the country of Denmark as his home, although he is a german citizen at the time. Another word worth mentioning could be "gamle" (old), referencing something that has been. Furthermore "længtes" (longing) is interesting, as it indicates Krestens state of mind during the war. The words in relation to "hjem" (home) are however overall positive, and relate more to Denmark than Germany, meaning Kresten saw Denmark as home more than he saw Germany as home.
+
+```{r}
+Breve_ttm_ngram%>%
+filter(word2 == "skyttegrav") %>%
+count(word1, sort = TRUE)
+```
+
+When searching on the word "skyttegrav" (trench), I again found no real pattern in the connections. The war doesn't appear as gruel, but nor does it appear as very positive.
+
+```{r}
+Breve_ttm_ngram%>%
+filter(word2 == "gud") %>%
+count(word1, sort = TRUE)
+```
+
+The last interesting word that I will be conducting a search on, is "Gud" (God). Interestingly the words connections are quite loaded words, for example "Bange" (afraid), the interjections "o" and "aa", and also words connected to thanking as was expected - All words that relate to a desperate situation. The ambiguous words from above regardign "krig" (war) and "skyttegrav" (trench), are not repeated in the words relating to God, which indicates a stronger notion about the war being gruel and harsh for the soldiers involved.
+
+The other listed words from above could be examined in the same manners as the chosen words above, but they show no clear pattern, making them worthless to study in this manner, which is why they will be excluded from the analysis.
+
+If one were to broaden this examination of words, one could use a trigram instead of a bigram, and then get 2 related words instead of just one. This could give a result with many more words than the afforementioned, and could broaden the analysis in a helpful way. One could also switch the words, so that the filter takes up the words behind the chosen word. This examnition is however not a fully functional research platform, but rather a gateway to further examnition of close-readings and textual work.
+It is however intereseting, that one can in theory conduct this analysis of the letters without reading a single letter beforehand, and still get a result remarkebly close to what a full-reading of the letters would give, making this tool very powerful indeed.
